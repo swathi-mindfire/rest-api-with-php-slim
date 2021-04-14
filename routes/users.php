@@ -110,6 +110,53 @@ $app->delete('/users/delete/{id}',function (Request $request ,Response $response
 
     }
 });
+$app->put('/users/update/{id}',function (Request $request ,Response $response,array $args) {
+    $id = $args['id'];
+    $data = (array)json_decode($request->getBody());
+    //$response->getBody()->write(json_encode($data));
+     //     return $response
+    //     ->withHeader('content-type','app/json')
+    //     ->withStatus(200);
+    $name = $data['name'];
+    $email = $data['email'];
+    $password = $data['password'];
+    $sql = "UPDATE users SET name = :name,email = :email,password = :password   WHERE id = :id";
+
+
+    try {
+        $db = new DB();
+        $conn = $db->connect();
+
+        $stmt =  $conn->prepare($sql);
+        $stmt->bindParam('id',$id);
+        $stmt->bindParam(':name',$name);
+        $stmt->bindParam(':email',$email);
+        $stmt->bindParam(':password',$password);
+
+        $res = $stmt->execute();
+        
+        $db = null;
+
+        $response->getBody()->write(json_encode($res));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(200);
+
+
+    } catch(PDOException  $e){
+
+        $error = array(
+            "message" =>$e->getMessage()
+        );
+
+        $response->getBody()->write(json_encode($error));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(500);;
+
+    }
+});
+
 
 
 ?>
