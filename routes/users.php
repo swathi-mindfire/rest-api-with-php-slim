@@ -36,7 +36,7 @@ $app->get('/users',function (Request $request ,Response $response) {
 
     }
 });
-$app->post('/users/add',function (Request $request ,Response $response,array $args) {
+$app->post('/users/register',function (Request $request ,Response $response,array $args) {
     $data = $request->getParsedBody();
     $name = $data['name'];
     $email = $data['email'];
@@ -58,6 +58,40 @@ $app->post('/users/add',function (Request $request ,Response $response,array $ar
         $db = null;
 
         $response->getBody()->write(json_encode($res));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(200);
+
+
+    } catch(PDOException  $e){
+
+        $error = array(
+            "message" =>$e->getMessage()
+        );
+
+        $response->getBody()->write(json_encode($error));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(500);;
+
+    }
+});
+$app->delete('/users/delete/{id}',function (Request $request ,Response $response,array $args) {
+
+    $id = $args['id'];
+    $sql = "DELETE FROM users WHERE id = $id";
+
+
+    try {
+        $db = new DB();
+        $conn = $db->connect();
+        $stmt = $conn->prepare($sql);
+
+        $result =  $stmt->execute();
+       
+        $db = null;
+
+        $response->getBody()->write(json_encode($result));
         return $response
         ->withHeader('content-type','app/json')
         ->withStatus(200);
