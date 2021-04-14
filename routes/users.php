@@ -36,4 +36,46 @@ $app->get('/users',function (Request $request ,Response $response) {
 
     }
 });
+$app->post('/users/add',function (Request $request ,Response $response,array $args) {
+    $data = $request->getParsedBody();
+    $name = $data['name'];
+    $email = $data['email'];
+    $password = $data['password'];
+    $sql = "INSERT  INTO users(name,email,password) VALUES(:name,:email,:password)";
+
+
+    try {
+        $db = new DB();
+        $conn = $db->connect();
+
+        $stmt =  $conn->prepare($sql);
+        $stmt->bindParam(':name',$name);
+        $stmt->bindParam(':email',$email);
+        $stmt->bindParam(':password',$password);
+
+        $res = $stmt->execute();
+        
+        $db = null;
+
+        $response->getBody()->write(json_encode($res));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(200);
+
+
+    } catch(PDOException  $e){
+
+        $error = array(
+            "message" =>$e->getMessage()
+        );
+
+        $response->getBody()->write(json_encode($error));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(500);;
+
+    }
+});
+
+
 ?>
