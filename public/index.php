@@ -4,18 +4,38 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 use Slim\Factory\AppFactory;
 
 require __DIR__ . '/../vendor/autoload.php';
-require __DIR__ . '/../config/db.php';
-
-
-
 $app = AppFactory::create();
-error_reporting(E_ALL);
-set_error_handler(function ($severity, $message, $file, $line) {
-    if (error_reporting() & $severity) {
-        throw new \ErrorException($message, 0, $severity, $file, $line);
-    }
+require __DIR__ . '/../includes/crud.php';
+$dbObj2= new Queries (); 
+$app->get('/users[/{id}]',function (Request $request ,Response $response,array $args) {
+    $dbObj = new Queries ();  
+    $response =  $dbObj->getUsers($request,$response,$args);
+    return $response;
 });
-require __DIR__ . '/../routes/users.php';
+$app->post('/users',function (Request $request ,Response $response) {
+    $dbObj = new Queries ();  
+    $response = $dbObj->createUser($request,$response);
+    return $response;
+});
+$app->delete('/users/{id}',function (Request $request ,Response $response,array $args) {
+    $dbObj = new Queries ();  
+    $response = $dbObj->deleteUser($request,$response,$args);
+    return $response;
+});
+$app->put('/users/{id}',function (Request $request ,Response $response,array $args) {
+    $dbObj = new Queries ();  
+    $response = $dbObj->updateUser($request,$response,$args);
+    return $response;
+    
+});
+$app->post('/users/login',function (Request $request ,Response $response,array $args) {
+    $dbObj = new Queries ();  
+    $response = $dbObj->loginAuthenticate($request,$response,$args);
+    return $response;
+    
+});
+
+
 
 
 
