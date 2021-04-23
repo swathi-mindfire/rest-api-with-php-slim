@@ -11,34 +11,42 @@ $app->get('/users[/{id}]',function (Request $request ,Response $response,array $
     if($pageno){
         $limit = 3;
         $start = ($pageno-1)*$limit;   
-        $sql = " SELECT * FROM users LIMIT $start,$limit";
+        $sql = " SELECT id,name,email FROM users LIMIT $start,$limit";
     }
     elseif($search){
-        $sql = "SELECT * FROM users WHERE name = '$search' ";
+        $sql = "SELECT id, name,email FROM users WHERE name = '$search' ";
     }
     elseif($id){
-        $sql = "SELECT * FROM users WHERE id = '$id' ";
+        $sql = "SELECT id,name,email FROM users WHERE id = '$id' ";
     }
     else {
-        $sql = " SELECT * FROM users";
+        $sql = " SELECT id,name,email FROM users";
     }   
     try {
         $db = new DB();
         $conn = $db->connect();
         $stmt =  $conn->query($sql);
-        $users = $stmt->fetchAll(PDO::FETCH_OBJ);
+        if($search || $id)
+        $users = $stmt->fetch(PDO::FETCH_OBJ);
+        else
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $db = null;
         if (empty($users)) {
-            $response->getBody()->write(json_encode(["status" => "No record found"]));
+            if($search || $id)
+                $statuscode = 404;
+            else
+                $statuscode = 204;
+
+            return $response
+            ->withStatus($statuscode);
         }
         else{
-            $response->getBody()->write(json_encode($users));
-
+            $response->getBody()->write(json_encode($users));           
+            return $response
+            ->withHeader('content-type','app/json')
+            ->withStatus(200);
         }
-        
-        $db = null;
-        return $response
-        ->withHeader('content-type','app/json')
-        ->withStatus(200);
+                
     } catch(PDOException  $e){
         $error = array("message" =>$e->getMessage());
         $response->getBody()->write(json_encode($error));
@@ -52,21 +60,31 @@ $app->post('/users',function (Request $request ,Response $response,array $args) 
     $name = $data['name']?? null;
     $email = $data['email']?? null;
     $password = $data['password']?? null;
+    $sql2 = "SELECT * FROM users WHERE email = '$email' ";
+
     if($name && $email && $password){
         $sql = "INSERT  INTO users(name,email,password) VALUES(:name,:email,:password)";
         try {
             $db = new DB();
             $conn = $db->connect();
-            $stmt =  $conn->prepare($sql);
-            $stmt->bindParam(':name',$name);
-            $stmt->bindParam(':email',$email);
-            $stmt->bindParam(':password',$password);
-            $res = $stmt->execute();        
-            $db = null;
-            $response->getBody()->write(json_encode(["status" => "Inserted successfully"]));
-            return $response
-            ->withHeader('content-type','app/json')
-            ->withStatus(200);
+            $stmt =  $conn->query($sql2);
+            $users = $stmt->fetchAll(PDO::FETCH_OBJ);
+            if (empty($users)) {
+                $stmt =  $conn->prepare($sql);
+                $stmt->bindParam(':name',$name);
+                $stmt->bindParam(':email',$email);
+                $stmt->bindParam(':password',$password);
+                $res = $stmt->execute();        
+                $db = null;
+                $response->getBody()->write(json_encode(["name" => $name,"email" => $email]));
+                return $response
+                ->withHeader('content-type','app/json')
+                ->withStatus(201);
+                
+            }
+            $response->getBody()->write("Email already exists");
+            return $response->withStatus(409);    
+           
         } catch(PDOException  $e){
             $error = array(
                 "message" =>$e->getMessage()
@@ -78,10 +96,16 @@ $app->post('/users',function (Request $request ,Response $response,array $args) 
         }
     }
     else  {
-        $response->getBody()->write(json_encode(["status" => "Insufficient details,Name email and passsword all fields are mandatory"]));
+        $suggestion = "";
+        if(!$name)
+        $suggestion .= "Name ";
+        if(!$email)
+        $suggestion .= " Email ";
+        if(!$password)
+        $suggestion .= " password";
+        $response->getBody()->write("$suggestion required");        
         return $response
-        ->withHeader('content-type','app/json')
-        ->withStatus(200);
+        ->withStatus(206);
     }
    
 });
@@ -94,22 +118,19 @@ $app->delete('/users/{id}',function (Request $request ,Response $response,array 
         $conn = $db->connect();
         $res = $conn->query($sql1);
         $res = $res->fetch(PDO::FETCH_ASSOC);
+        $db = null; 
         if($res){
             $stmt = $conn->prepare($sql);
-            $result =  $stmt->execute();       
-            $db = null;
-            $response->getBody()->write(json_encode(["status" => "Deleted successfully"]));
-        }
-        else  $response->getBody()->write(json_encode(["status" => "User Not Found"]));
-      
+            $result =  $stmt->execute();                          
+            return $response
+            ->withStatus(204);
+        }                 
         return $response
-        ->withHeader('content-type','app/json')
-        ->withStatus(200);
+        ->withStatus(404);     
     } catch(PDOException  $e){
         $error = array(
             "message" =>$e->getMessage()
         );
-
         $response->getBody()->write(json_encode($error));
         return $response
         ->withHeader('content-type','app/json')
@@ -138,13 +159,18 @@ $app->put('/users/{id}',function (Request $request ,Response $response,array $ar
             $stmt->bindParam(':password',$password);
             $res = $stmt->execute();       
             $db = null;
-            $response->getBody()->write(json_encode(["status" => "updated successfully"]));
+            $response->getBody()->write(json_encode(["name" => $name,"email" => $email]));
+            return $response
+            ->withHeader('content-type','app/json')
+            ->withStatus(200);
         }
-        else $response->getBody()->write(json_encode(["status" => "user not found"]));
+        else {
+            return $response
+            ->withStatus(404);
+        }
+     
       
-        return $response
-        ->withHeader('content-type','app/json')
-        ->withStatus(200);
+       
     } catch(PDOException  $e){
         $error = array(
             "message" =>$e->getMessage()
@@ -167,16 +193,14 @@ $app->post('/users/login',function (Request $request ,Response $response,array $
         $res = $stmt->fetchAll(PDO::FETCH_OBJ);        
         $db = null;
         if($res){           
-            $response->getBody()->write(json_encode(["status"=> "login success"]));
             return $response
             ->withHeader('content-type','app/json')
             ->withStatus(200);
         }
         else{            
-            $response->getBody()->write(json_encode(["Error" =>"Invalid credentials"]));
             return $response
             ->withHeader('content-type','app/json')
-            ->withStatus(200);
+            ->withStatus(401);
         }
     } catch(PDOException  $e){
 
