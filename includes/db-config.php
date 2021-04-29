@@ -1,14 +1,19 @@
 <?php
+require_once  __DIR__ . '/../FileMakerLib/FileMaker.php';
 class DB {
-    private $host = 'localhost';
-    private $user = 'root';
-    private $password = '';
-    private $dbname = 'api-demo';
+    private $fmDb;
+    private $fmHost;
+    private $fmUser;
+    private $fmPassword;   
+    function __construct($fmDb,$fmHost,$fmUser,$fmPassword){
+        $this->fmDb = $fmDb;
+        $this->fmHost = $fmHost;
+        $this->fmUser = $fmUser;
+        $this->fmPassword = $fmPassword;        
+    }
     public function connect(){        
-       $dsn = 'mysql:host='. $this->host .';dbname='. $this->dbname;
-       $con = new PDO($dsn,$this->user,$this->password);
-       $con->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
-       return $con;
+        $fmCon = new FileMaker( $this->fmDb, $this->fmHost, $this->fmUser, $this->fmPassword);
+        return $fmCon;   
     }
 }
 ?>

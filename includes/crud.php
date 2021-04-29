@@ -1,95 +1,120 @@
 <?php
-require 'db-config.php';
+require_once 'db-config.php';
+
 class Queries {
+    private $layout;
+    private $conn;
+    function __construct()
+    {
+        $db = new DB("users","192.168.10.62","Admin","Sw@thifilem@ker1");
+        $this->conn = $db->connect();
+    }
+
+    function setLayout($layout){
+        $this->layout = $layout;
+    }
+    
     public function getUsers($request,$response,$args){
-        $id = $args['id'] ?? null;
+        $this->setLayout("users");       
+        $searchId = $args['id'] ?? null;
         $pageno =  $request->getQueryParams()['page']?? null;
         $search =  $request->getQueryParams()['search']?? null; 
         if($pageno){
             $limit = 3;
             $start = ($pageno-1)*$limit;   
-            $sql = " SELECT id,name,email FROM users LIMIT $start,$limit";
+            $req = $this->conn->newFindCommand($this->layout);
+            $req->setRange($start,$limit);
         }
         elseif($search){
-            $sql = "SELECT id, name,email FROM users WHERE name = '$search' ";
+            $req = $this->conn->newFindCommand($this->layout);
+            $req->addFindCriterion("name",$search);
         }
-        elseif($id){
-            $sql = "SELECT id,name,email FROM users WHERE id = '$id' ";
+        elseif($searchId){
+            $req = $this->conn->newFindCommand($this->layout);
+            $req->addFindCriterion("Id",$searchId);
         }
         else {
-            $sql = " SELECT id,name,email FROM users";
-        }   
-        try {
-            $db = new DB();
-            $conn = $db->connect();
-            $stmt =  $conn->query($sql);
-            if($search || $id)
-            $users = $stmt->fetch(PDO::FETCH_OBJ);
-            else
-            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $db = null;
-            if (empty($users)) {
-                if($search || $id)
-                    $statuscode = 404;
-                else
-                    $statuscode = 204;
+            $req = $this->conn->newFindAllCommand($this->layout);
+        }
+        
+        $result = $req->execute();
 
-                return $response
-                ->withStatus($statuscode);
-            }
-            else{
-                $response->getBody()->write(json_encode($users));           
-                return $response
-                ->withHeader('content-type','app/json')
-                ->withStatus(200);
-            }                   
-        } catch(PDOException  $e){
-            $error = array("message" =>$e->getMessage());
+        if(FileMaker::isError($result)){
+            $error = $result;           
             $response->getBody()->write(json_encode($error));
             return $response
             ->withHeader('content-type','app/json')
-            ->withStatus(500);;
+            ->withStatus(500);           
         }
+        else{
+            // $users = $result->getRecords();
+            // if(empty($users)){
+            //     if($search || $searchId)
+            //     $statuscode = 404;
+            //     else
+            //     $statuscode = 204;
+
+            // return $response
+            // ->withStatus($statuscode);
+            // }   
+            $records = $result->getRecords();
+            $users = array(array());
+            $index=0;
+            foreach($records as $record)
+            {
+                $users[$index]['Id'] = $record->getRecordId();
+                $users[$index]['Name'] = $record->getField('Name');
+                $users[$index]['Email'] = $record->getField('Email');        
+                $index++;
+            }                  
+            $response->getBody()->write(json_encode($users));          
+            return $response
+            ->withHeader('content-type','app/json')
+            ->withStatus(200);
+        }
+        
     }
     public function createUser($request,$response){
         $data = $request->getParsedBody();
         $name = $data['name']?? null;
         $email = $data['email']?? null;
         $password = $data['password']?? null;
-        $sql2 = "SELECT * FROM users WHERE email = '$email' ";
-
         if($name && $email && $password){
-            $sql = "INSERT  INTO users(name,email,password) VALUES(:name,:email,:password)";
-            try {
-                $db = new DB();
-                $conn = $db->connect();
-                $stmt =  $conn->query($sql2);
-                $users = $stmt->fetchAll(PDO::FETCH_OBJ);
-                if (empty($users)) {
-                    $stmt =  $conn->prepare($sql);
-                    $stmt->bindParam(':name',$name);
-                    $stmt->bindParam(':email',$email);
-                    $stmt->bindParam(':password',$password);
-                    $res = $stmt->execute();        
-                    $db = null;
-                    $response->getBody()->write(json_encode(["name" => $name,"email" => $email]));
-                    return $response
-                    ->withHeader('content-type','app/json')
-                    ->withStatus(201);
-                    
-                }
-                $response->getBody()->write("Email already exists");
-                return $response->withStatus(409);    
-            
-            } catch(PDOException  $e){
-                $error = array(
-                    "message" =>$e->getMessage()
-                );
-                $response->getBody()->write(json_encode($error));
+            $req = $this->conn->newFindCommand($this->layout);
+            $req->addFindCriterion("Email",$email);
+            $tempResult = $req->execute();
+            if(FileMaker::isError($tempResult)){
+                $error = $tempResult;           
+                $response->getBody()->write(json_encode("error"));
                 return $response
                 ->withHeader('content-type','app/json')
-                ->withStatus(500);;
-            }
+                ->withStatus(500);           
+            }  
+            else{
+                $records = $tempResult->getRecords();
+
+            }                  
+            
+            if(empty($records)){
+                $newUserDetails['Name']=  $name;
+                $newUserDetails['Email'] = $email;
+                $newUserDetails['Password'] = $password;
+                $req = $this->conn->newAddCommand("users",$newUserDetails);
+                $result = $req->execute();
+                if(FileMaker::isError($result)){
+                    $error = $result;                    
+                    $response->getBody()->write(json_encode($error));
+                    return $response
+                    ->withHeader('content-type','app/json')
+                    ->withStatus(500);           
+                }                   
+                $response->getBody()->write(json_encode(["name" => $name,"email" => $email]));
+                return $response
+                ->withHeader('content-type','app/json')
+                ->withStatus(201);
+            }            
+            $response->getBody()->write("Email already exists");
+            return $response->withStatus(409); 
         }
         else  {
             $suggestion = "";
@@ -103,110 +128,70 @@ class Queries {
             return $response
             ->withStatus(206);
         }
-    }
-
-    public function deleteUser($requset,$response,$args){
-        $id = $args['id'];
-        $sql = "DELETE FROM users WHERE id = $id";
-        $sql1 = "SELECT * FROM users WHERE id = '$id' ";
-        try {
-            $db = new DB();
-            $conn = $db->connect();
-            $res = $conn->query($sql1);
-            $res = $res->fetch(PDO::FETCH_ASSOC);
-            $db = null; 
-            if($res){
-                $stmt = $conn->prepare($sql);
-                $result =  $stmt->execute();                          
-                return $response
-                ->withStatus(204);
-            }                 
-            return $response
-            ->withStatus(404);     
-        } catch(PDOException  $e){
-            $error = array(
-                "message" =>$e->getMessage()
-            );
+    } 
+    public function delete($response,$args){
+        $id =$args['id'];        
+        $findCommand =$this->conn->newFindCommand($this->layout);
+        $findCommand->addFindCriterion('id', "==$id");
+        $result = $findCommand->execute();    
+       if ($this->class::isError($result)) {
+            $error = $result;                    
             $response->getBody()->write(json_encode($error));
             return $response
             ->withHeader('content-type','app/json')
-            ->withStatus(500);;
-        }
+            ->withStatus(500); 
+       }
+       else{
+        $records = $result->getRecords(); 
+        $records[0]->delete();
+        return $response
+        ->withStatus(204); 
+        // return $response
+        // ->withStatus(404); 
+       }      
     }
-
     function updateUser($request,$response,$args){ 
         $id = $args['id'];
-        $data = (array)json_decode($request->getBody()); 
-        $sql = "UPDATE users SET name = :name,email = :email,password = :password   WHERE id = :id";
-        $sql1 = "SELECT * FROM users WHERE id = '$id' ";
-        try {
-            $db = new DB();
-            $conn = $db->connect();
-            $res = $conn->query($sql1);
-            $res = $res->fetch(PDO::FETCH_ASSOC);
-            if($res){
-                $name = $data['name'] ?? $res['name'];
-                $email = $data['email']?? $res['email'];
-                $password = $data['password']?? $res['password'];
-                $stmt =  $conn->prepare($sql);
-                $stmt->bindParam('id',$id);
-                $stmt->bindParam(':name',$name);
-                $stmt->bindParam(':email',$email);
-                $stmt->bindParam(':password',$password);
-                $res = $stmt->execute();       
-                $db = null;
-                $response->getBody()->write(json_encode(["name" => $name,"email" => $email]));
-                return $response
-                ->withHeader('content-type','app/json')
-                ->withStatus(200);
-            }
-            else {
+        $data = (array)json_decode($request->getPBody()); 
+        $findCommand =$this->conn->newFindCommand($this->layout);
+        $findCommand->addFindCriterion('id', $id);
+        $result = $findCommand->execute();   
+        if ($this->class::isError($result)) {
+            if($result->code =401){
                 return $response
                 ->withStatus(404);
-            }       
-        } catch(PDOException  $e){
-            $error = array(
-                "message" =>$e->getMessage()
-            );
-            $response->getBody()->write(json_encode($error));
-            return $response
-            ->withHeader('content-type','app/json')
-            ->withStatus(500);;
+            }
+            else{
+                $error = $result;                    
+                $response->getBody()->write(json_encode($error));
+                return $response
+                ->withHeader('content-type','app/json')
+                ->withStatus(500);                 
+            }              
         }
-    }
-    function loginAuthenticate($request,$response){
-        $data = $request->getParsedBody();
-        $email = $data['email'];
-        $password = $data['password'];
-        $sql = "SELECT * FROM users WHERE email = '$email' and password = '$password' ";
-        try {
-            $db = new DB();
-            $conn = $db->connect();
-            $stmt =  $conn->query($sql);
-            $res = $stmt->fetchAll(PDO::FETCH_OBJ);        
-            $db = null;
-            if($res){           
+        else{
+            $user = $result->getRecords();
+            $id= $user[0]->getField('Id');
+            $userEditDetails= [];
+            $userEditDetails['Name']= $data['name'] ?? $user[0]->getField('Name');
+            $userEditDetails['Email']= $data['email']?? $user[0]->getField('Email');
+            $userEditDetails['Password']= $data['password']?? $user[0]->getField('Password');
+            $userEdit = $this->conn->newEditCommand($this->layout,$id,$userEditDetails);
+            $result = $userEdit->execute();
+            if($result){
+                $response->getBody()->write(json_encode(["id" => $id,"name" => $userEditDetails['Name'],"email" => $userEditDetails['Email']]));
                 return $response
                 ->withHeader('content-type','app/json')
                 ->withStatus(200);
             }
-            else{            
-                return $response
-                ->withHeader('content-type','app/json')
-                ->withStatus(401);
-            }
-        } catch(PDOException  $e){
-
-            $error = array(
-                "message" =>$e->getMessage()
-            );
-            $response->getBody()->write(json_encode($error));
-            return $response
-            ->withHeader('content-type','app/json')
-            ->withStatus(500);;
 
         }
+      
     }
+    
+    
+
+   
 }
     
 ?>
