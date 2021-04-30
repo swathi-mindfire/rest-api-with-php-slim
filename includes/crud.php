@@ -204,11 +204,49 @@ class Queries {
                     ->withHeader('content-type','app/json')
                     ->withStatus(404);
                 }            
-                        return $response
-                         ->withHeader('content-type','app/json')
-                         ->withStatus(500); 
+                return $response
+                    ->withHeader('content-type','app/json')
+                    ->withStatus(500); 
             } 
             return $response ->withStatus(204);   
+    }
+    function loginAuthenticate($request,$response){
+        $this->setLayout("users"); 
+        $data = $request->getParsedBody();
+        $email = $data['email'];
+        $password = $data['password'];
+        $findcmd = $this->conn->newFindCommand($this->layout);            
+        $findcmd->addFindCriterion("Email","==$email");
+        $result = $findcmd->execute();
+        if(FileMaker::isError($result)){
+            if($result->code==401){
+                $response->getBody()->write(json_encode("Email Not Exists"));
+                return $response
+                ->withHeader('content-type','app/json')
+                ->withStatus(401);
+            }
+            return $response
+                ->withHeader('content-type','app/json')
+                ->withStatus(500);
+
+        }
+        $records = $result->getRecords();
+        $actualPassword = $records[0]->getField("Password");
+        if($actualPassword === $password){
+            $response->getBody()->write(json_encode("Login Succeess"));
+            return $response
+            ->withHeader('content-type','app/json')
+            ->withStatus(200);
+
+        }
+        $response->getBody()->write(json_encode("Invalid Password"));
+        return $response
+        ->withHeader('content-type','app/json')
+        ->withStatus(401);
+        
+       
+    
+        
     }   
 }
     

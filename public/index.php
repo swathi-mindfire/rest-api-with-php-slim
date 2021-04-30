@@ -28,7 +28,8 @@ $app->put('/users/{id}',function (Request $request ,Response $response,array $ar
     return $response;
     
 });
-$app->post('/users/login',function (Request $request ,Response $response,array $args,$dbObj) {   
+$app->post('/users/login',function (Request $request ,Response $response,array $args) { 
+    $dbObj= new Queries ();  
     $response = $dbObj->loginAuthenticate($request,$response,$args);
     return $response;
     
