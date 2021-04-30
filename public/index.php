@@ -17,11 +17,13 @@ $app->post('/users',function (Request $request ,Response $response) {
     $response = $dbObj->createUser($request,$response);
     return $response;
 });
-$app->delete('/users/{id}',function (Response $response,array $args,$dbObj) { 
-    $response = $dbObj->deleteUser($response,$args);
+$app->delete('/users/{id}',function (Request $request,Response $response,array $args) {
+    $dbObj= new Queries ();  
+    $response = $dbObj->deleteUser($request,$response,$args);
     return $response;
 });
-$app->put('/users/{id}',function (Request $request ,Response $response,array $args,$dbObj) {  
+$app->put('/users/{id}',function (Request $request ,Response $response,array $args) {
+    $dbObj= new Queries ();
     $response = $dbObj->updateUser($request,$response,$args);
     return $response;
     
