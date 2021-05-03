@@ -1,16 +1,12 @@
 <?php
-require_once 'db-config.php';
+require_once 'config.php';
 
 class Queries {
     public $layout;
-    public $conn;
-    private $database = "users";
-    private $serverIp = "192.168.10.62";
-    private $userName = "Admin";
-    private $password = "Sw@thifilem@ker1";
+    public $conn; 
     function __construct()
     {
-        $db = new DB($this->database,$this->serverIp,$this->userName,$this->password);
+        $db = new DB();
         $this->conn = $db->connect();
     }
     function setLayout($layout){
@@ -141,7 +137,7 @@ class Queries {
             $suggestion .= " password";
             $response->getBody()->write(json_encode("$suggestion required"));        
             return $response
-            ->withStatus(206);
+            ->withStatus(400);
         }
     }
     function updateUser($request,$response,$args){ 
