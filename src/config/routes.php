@@ -1,11 +1,8 @@
 <?php
-use Slim\Factory\AppFactory;
-$app = AppFactory::create();
-require __DIR__ . '/../services/crud.php';
-$dbObj= new Queries (); 
-$app->get('/users[/{id}]','Queries:getUsers');
-$app->post('/users','Queries:createUser');
-$app->delete('/users/{id}','Queries:deleteUser');
-$app->put('/users/{id}','Queries:updateUser');
-$app->post('/users/login','Queries:loginAuthenticate');
+require __DIR__ . '/../controllers/usersController.php';
+$app->get('/users[/{id}]','UsersController:getUsers');
+$app->post('/users','UsersController:createUser');
+$app->delete('/users/{id}','UsersController:deleteUser');
+$app->put('/users/{id}','UsersController:updateUser');
+$app->post('/users/login','UsersController:loginAuthenticate');
 $app->run();
